@@ -1,0 +1,65 @@
+---
+# tasks file for gitlab
+- name: Only run "update_cache=yes" if the last one is more than 3600 seconds ago
+  ansible.builtin.apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install a list of packages
+  ansible.builtin.apt:
+    pkg:
+    - tzdata 
+    - curl
+    - ca-certificates 
+    - openssh-server
+    - docker.io
+
+#- name: Import the GPG key for Gitlab
+#  environment:
+#    gpg_key_url: https://packages.gitlab.com/gitlab/gitlab-ce/gpgkey
+#  ansible.builtin.shell: curl -fsSL $gpg_key_url| sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/gitlab.gpg
+
+- name: Create repo file
+  ansible.builtin.shell: touch /etc/apt/sources.list.d/gitlab_gitlab-ce.list
+
+- name: Add the Gitlab repository
+  ansible.builtin.blockinfile:
+    path: /etc/apt/sources.list.d/gitlab_gitlab-ce.list
+    block: |
+      deb https://packages.gitlab.com/gitlab/gitlab-ce/ubuntu/ focal main
+      deb-src https://packages.gitlab.com/gitlab/gitlab-ce/ubuntu/ focal main
+
+- name: Dpkg reconfigure
+  ansible.builtin.shell: dpkg --configure -a
+
+- name: Install Gitlab
+  ansible.builtin.apt:
+    name: gitlab-ce
+    update_cache: yes
+
+- name: Reconfigure Gitlab
+  ansible.builtin.shell: gitlab-ctl reconfigure
+  register: gitlab_config_status
+
+- name: Reconfigure Gitlab status
+  ansible.builtin.debug:
+    msg: "{{ gitlab_config_status }}"
+
+- name: Verify installation
+  ansible.builtin.shell: gitlab-rake gitlab:env:info
+  register: gitlab_status
+
+- name: Verify installation
+  ansible.builtin.debug:
+    msg: "{{ gitlab_status }}"
+
+- name: Start Gitlab
+  ansible.builtin.shell: gitlab-ctl start
+
+- name: Grab Gitlab initial password
+  ansible.builtin.shell: cat /etc/gitlab/initial_root_password
+  register: gitlab_initial_pwd
+
+- name: Verify installation
+  ansible.builtin.debug:
+    msg: "{{ gitlab_initial_pwd }}"
